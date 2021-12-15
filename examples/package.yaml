@@ -1,0 +1,5 @@
+dependencies:
+  http:
+    path: ../../http
+  websocket:
+    path: ..

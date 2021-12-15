@@ -1,0 +1,5 @@
+prefixes:
+  http: pkg-http
+packages:
+  pkg-http:
+    path: ../http

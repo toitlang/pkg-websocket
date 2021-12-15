@@ -1,0 +1,10 @@
+prefixes:
+  http: http
+  websocket: ..
+packages:
+  ..:
+    path: ..
+    prefixes:
+      http: http
+  http:
+    path: ../../http
