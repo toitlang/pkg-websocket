@@ -9,11 +9,20 @@ import writer
 import net.tcp
 import crypto.sha1
 
+/**
+Tests whether an incoming HTTP request is a Websocket upgrade request.
+
+If returns true, $Session.upgrade can be called on the request to upgrade it
+  to a by-directional websocket session with the peer.
+*/
 is_websocket_upgrade request/http.Request-> bool:
   if not request.headers.matches "Connection" "Upgrade": return false
   if not request.headers.matches "Upgrade" "Websocket": return false
   return true
 
+/**
+A Websocket session to a remote peer, allowing for by-directional message communication.
+*/
 class Session:
   static OPCODE_MASK_ ::= 0xf
   static PAYLOAD_LENGTH_MASK_ ::= 0x7f
@@ -33,20 +42,37 @@ class Session:
   writer_/writer.Writer
   is_client_/bool
 
+  /**
+  Creates a client-side Websocket session from a TCP socket already upgraded.
+
+  See $Session.connect and $Session.from_client_request for how to establish a Websocket
+    session by upgrading a HTTP request.
+  */
   constructor.client .socket_/tcp.Socket:
     reader_ = reader.BufferedReader socket_
     writer_ = writer.Writer socket_
     is_client_ = true
 
+  /**
+  Creates a server-side Websocket session from a TCP socket already upgraded.
+
+  See $Session.upgrade for how to upgrade an incoming HTTP request.
+  */
   constructor.server .socket_/tcp.Socket:
     reader_ = reader.BufferedReader socket_
     writer_ = writer.Writer socket_
     is_client_ = false
 
+  /**
+  Connects and upgrades a Websocket session using the HTTP $client.
+  */
   constructor.connect client/http.Client host/string path/string --headers/http.Headers=http.Headers:
     request := client.new_request http.GET host path --headers=headers
-    return from_client_request request
+    return Session.from_client_request request
 
+  /**
+  Upgrades an incoming HTTP $request to a Websocket session.
+  */
   constructor.upgrade request/http.Request response/http.ResponseWriter:
     if not is_websocket_upgrade request: throw "Request is not being upgraded to websocket"
 
@@ -63,7 +89,10 @@ class Session:
 
     return Session.server response.detach
 
-  static from_client_request request/http.Request -> Session:
+  /**
+  Instruments and upgrades an existing HTTP request, by setting Websocket headers and completes the request.
+  */
+  constructor.from_client_request request/http.Request:
     request.headers.set "Connection" "Upgrade"
     request.headers.set "Upgrade" "websocket"
     random_bytes := ByteArray 16: random 0x100
@@ -86,6 +115,7 @@ class Session:
 
   /**
   Sends a single message.
+
   $data can be a string or a byte array.
   */
   send data -> none:
@@ -214,6 +244,6 @@ class Session:
       return payload
     return payload.to_string
 
-// Perform the calculation from RFC 6455 to verify an HTTP->WebSockets upgrade.
-magic_accept_ key:
-  return base64.encode (sha1.sha1 key + "258EAFA5-E914-47DA-95CA-C5AB0DC85B11")
+  // Perform the calculation from RFC 6455 to verify an HTTP->WebSockets upgrade.
+  static magic_accept_ key:
+    return base64.encode (sha1.sha1 key + "258EAFA5-E914-47DA-95CA-C5AB0DC85B11")
